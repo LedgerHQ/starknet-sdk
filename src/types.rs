@@ -47,6 +47,10 @@ impl FieldElement {
     pub fn clear(&mut self) {
         self.value.fill(0);
     }
+
+    pub fn copy_from(&mut self, f: &FieldElement) {
+        self.value.copy_from_slice(&f.value);
+    }
 }
 
 impl From<&[u8]> for FieldElement {
@@ -156,19 +160,16 @@ impl AbstractCall {
         self.calldata.fill(AbstractCallData::Felt(FieldElement::ZERO));
         self.calldata_len = 0;
     }
-}
 
-impl From<Call> for AbstractCall {
-    fn from(c: Call) -> Self {
-        let mut a: AbstractCall = AbstractCall::new();
-        a.to = c.to;
-        a.selector = c.selector;
-        a.method = c.method;
-        for data in c.calldata {
-            a.calldata[a.calldata_len] = AbstractCallData::Felt(data);
-            a.calldata_len += 1;
+    pub fn copy_from(&mut self, call: &Call) {
+        self.to.copy_from(&call.to);
+        self.method.copy_from(&call.method);
+        self.selector.copy_from(&call.selector);
+        for i in 0..call.calldata_len {
+            let mut fe = FieldElement::new();
+            fe.copy_from(&call.calldata[i]);
+            self.calldata[i] = AbstractCallData::Felt(fe);
         }
-        a
     }
 }
 
