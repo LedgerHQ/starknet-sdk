@@ -1,47 +1,44 @@
+use core::ops::{Add, Mul, Rem, Sub};
+use nanos_sdk::bindings::{
+    cx_bn_add, cx_bn_alloc, cx_bn_alloc_init, cx_bn_destroy, cx_bn_export, cx_bn_lock,
+    cx_bn_mod_add, cx_bn_mod_mul, cx_bn_mod_sub, cx_bn_reduce, cx_bn_t, cx_bn_unlock,
+};
 use nanos_sdk::string::String;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct FieldElement {
-    pub value: [u8; 32]
+    pub value: [u8; 32],
 }
 
 impl FieldElement {
-
     pub const INVOKE: FieldElement = FieldElement {
         value: [
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x69, 0x6e, 0x76, 0x6f, 0x6b, 0x65
-        ]
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x69, 0x6e,
+            0x76, 0x6f, 0x6b, 0x65,
+        ],
     };
 
-    pub const ZERO: FieldElement = FieldElement {
-        value: [0u8; 32]
-    };
+    pub const ZERO: FieldElement = FieldElement { value: [0u8; 32] };
 
     pub const ONE: FieldElement = FieldElement {
         value: [
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01
-        ]
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x01,
+        ],
     };
 
     pub const TWO: FieldElement = FieldElement {
         value: [
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02
-        ]
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x02,
+        ],
     };
 
     pub fn new() -> Self {
-        Self {
-            value: [0u8; 32]
-        }
+        Self { value: [0u8; 32] }
     }
 
     pub fn clear(&mut self) {
@@ -53,13 +50,160 @@ impl FieldElement {
     }
 }
 
+const P: FieldElement = FieldElement {
+    value: [
+        08, 00, 00, 00, 00, 00, 00, 11, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00, 00,
+        00, 00, 00, 00, 00, 00, 00, 00, 01,
+    ],
+};
+
+impl<'a, 'b> Add<&'b FieldElement> for &'a FieldElement {
+    type Output = FieldElement;
+
+    fn add(self, other: &'b FieldElement) -> FieldElement {
+        let mut result_bn: cx_bn_t = Default::default();
+        let mut self_bn: cx_bn_t = Default::default();
+        let mut other_bn: cx_bn_t = Default::default();
+        let mut p_bn: cx_bn_t = Default::default();
+        let mut result = FieldElement::new();
+
+        unsafe {
+            cx_bn_lock(32, 0);
+
+            // Initialize and set self_bn and other_bn
+            cx_bn_alloc_init(&mut self_bn, 32, self.value[..].as_ptr(), 32);
+            cx_bn_alloc_init(&mut other_bn, 32, other.value[..].as_ptr(), 32);
+            cx_bn_alloc_init(&mut p_bn, 32, P.value[..].as_ptr(), 32);
+
+            // Allocate space for result_bn
+            cx_bn_alloc(&mut result_bn, 32);
+
+            // Perform addition
+            cx_bn_mod_add(result_bn, self_bn, other_bn, p_bn);
+
+            // Export result_bn to result FieldElement
+            cx_bn_export(result_bn, result.value[..].as_mut_ptr(), 32);
+
+            // Destroy used bignums
+            cx_bn_destroy(&mut self_bn);
+            cx_bn_destroy(&mut other_bn);
+            cx_bn_destroy(&mut result_bn);
+            cx_bn_destroy(&mut p_bn);
+
+            cx_bn_unlock();
+        }
+
+        result
+    }
+}
+
+impl<'a, 'b> Mul<&'b FieldElement> for &'a FieldElement {
+    type Output = FieldElement;
+
+    fn mul(self, other: &'b FieldElement) -> FieldElement {
+        let mut result_bn: cx_bn_t = Default::default();
+        let mut self_bn: cx_bn_t = Default::default();
+        let mut other_bn: cx_bn_t = Default::default();
+        let mut p_bn: cx_bn_t = Default::default();
+        let mut result = FieldElement::new();
+
+        unsafe {
+            cx_bn_lock(32, 0);
+
+            cx_bn_alloc_init(&mut self_bn, 32, self.value[..].as_ptr(), 32);
+            cx_bn_alloc_init(&mut other_bn, 32, other.value[..].as_ptr(), 32);
+            cx_bn_alloc_init(&mut p_bn, 32, P.value[..].as_ptr(), 32);
+
+            cx_bn_alloc(&mut result_bn, 32);
+
+            cx_bn_mod_mul(result_bn, self_bn, other_bn, p_bn);
+
+            cx_bn_export(result_bn, result.value[..].as_mut_ptr(), 32);
+
+            cx_bn_destroy(&mut self_bn);
+            cx_bn_destroy(&mut other_bn);
+            cx_bn_destroy(&mut result_bn);
+            cx_bn_destroy(&mut p_bn);
+
+            cx_bn_unlock();
+        }
+
+        result
+    }
+}
+
+impl<'a, 'b> Sub<&'b FieldElement> for &'a FieldElement {
+    type Output = FieldElement;
+
+    fn sub(self, other: &'b FieldElement) -> FieldElement {
+        let mut result_bn: cx_bn_t = Default::default();
+        let mut self_bn: cx_bn_t = Default::default();
+        let mut other_bn: cx_bn_t = Default::default();
+        let mut p_bn: cx_bn_t = Default::default();
+        let mut result = FieldElement::new();
+
+        unsafe {
+            cx_bn_lock(32, 0);
+
+            cx_bn_alloc_init(&mut self_bn, 32, self.value[..].as_ptr(), 32);
+            cx_bn_alloc_init(&mut other_bn, 32, other.value[..].as_ptr(), 32);
+            cx_bn_alloc_init(&mut p_bn, 32, P.value[..].as_ptr(), 32);
+
+            cx_bn_alloc(&mut result_bn, 32);
+
+            cx_bn_mod_sub(result_bn, self_bn, other_bn, p_bn);
+
+            cx_bn_export(result_bn, result.value[..].as_mut_ptr(), 32);
+
+            cx_bn_destroy(&mut self_bn);
+            cx_bn_destroy(&mut other_bn);
+            cx_bn_destroy(&mut result_bn);
+            cx_bn_destroy(&mut p_bn);
+
+            cx_bn_unlock();
+        }
+
+        result
+    }
+}
+
+impl<'a, 'b> Rem<&'b FieldElement> for &'a FieldElement {
+    type Output = FieldElement;
+
+    fn rem(self, other: &'b FieldElement) -> FieldElement {
+        let mut result_bn: cx_bn_t = Default::default();
+        let mut self_bn: cx_bn_t = Default::default();
+        let mut other_bn: cx_bn_t = Default::default();
+        let mut result = FieldElement::new();
+
+        unsafe {
+            cx_bn_lock(32, 0);
+
+            cx_bn_alloc_init(&mut self_bn, 32, self.value[..].as_ptr(), 32);
+            cx_bn_alloc_init(&mut other_bn, 32, other.value[..].as_ptr(), 32);
+
+            cx_bn_alloc(&mut result_bn, 32);
+
+            cx_bn_reduce(result_bn, self_bn, other_bn);
+
+            cx_bn_export(result_bn, result.value[..].as_mut_ptr(), 32);
+
+            cx_bn_destroy(&mut self_bn);
+            cx_bn_destroy(&mut other_bn);
+            cx_bn_destroy(&mut result_bn);
+
+            cx_bn_unlock();
+        }
+
+        result
+    }
+}
+
 impl From<&[u8]> for FieldElement {
     fn from(data: &[u8]) -> Self {
         let mut value: [u8; 32] = [0; 32];
-        value.copy_from_slice(data); 
-        Self {
-            value: value
-        }
+        value.copy_from_slice(data);
+        Self { value: value }
     }
 }
 
@@ -123,7 +267,7 @@ impl From<&FieldElement> for String<64> {
 
 /// Maximum numbers of calls in a multicall Tx (out of memory)
 /// NanoS = 3
-/// NanoS+ = 10 (maybe more ?) 
+/// NanoS+ = 10 (maybe more ?)
 const MAX_TX_CALLS: usize = 10;
 
 #[derive(Debug, Copy, Clone)]
@@ -139,17 +283,17 @@ pub struct AbstractCall {
     pub method: String<32>,
     pub selector: FieldElement,
     pub calldata: [AbstractCallData; 8],
-    pub calldata_len: usize
+    pub calldata_len: usize,
 }
 
-impl AbstractCall { 
+impl AbstractCall {
     pub fn new() -> Self {
         Self {
             to: FieldElement::new(),
             method: String::new(),
             selector: FieldElement::new(),
             calldata: [AbstractCallData::Felt(FieldElement::ZERO); 8],
-            calldata_len: 0
+            calldata_len: 0,
         }
     }
 
@@ -157,7 +301,8 @@ impl AbstractCall {
         self.to.clear();
         self.method.clear();
         self.selector.clear();
-        self.calldata.fill(AbstractCallData::Felt(FieldElement::ZERO));
+        self.calldata
+            .fill(AbstractCallData::Felt(FieldElement::ZERO));
         self.calldata_len = 0;
     }
 
@@ -179,17 +324,17 @@ pub struct Call {
     pub method: String<32>,
     pub selector: FieldElement,
     pub calldata: [FieldElement; 16],
-    pub calldata_len: usize
+    pub calldata_len: usize,
 }
 
-impl Call { 
+impl Call {
     pub fn new() -> Self {
         Self {
             to: FieldElement::new(),
             method: String::new(),
             selector: FieldElement::new(),
             calldata: [FieldElement::ZERO; 16],
-            calldata_len: 0
+            calldata_len: 0,
         }
     }
 
@@ -208,7 +353,7 @@ pub struct TransactionInfo {
     pub nonce: FieldElement,
     pub version: FieldElement,
     pub chain_id: FieldElement,
-    pub callarray_len: FieldElement
+    pub callarray_len: FieldElement,
 }
 
 impl TransactionInfo {
@@ -219,7 +364,7 @@ impl TransactionInfo {
             nonce: FieldElement::new(),
             version: FieldElement::new(),
             chain_id: FieldElement::new(),
-            callarray_len: FieldElement::new()
+            callarray_len: FieldElement::new(),
         }
     }
 
@@ -235,14 +380,14 @@ impl TransactionInfo {
 
 pub struct Transaction {
     pub tx_info: TransactionInfo,
-    pub calldata: [Call; MAX_TX_CALLS]
+    pub calldata: [Call; MAX_TX_CALLS],
 }
 
 impl Transaction {
     pub fn new() -> Self {
         Self {
             tx_info: TransactionInfo::new(),
-            calldata: [Call::new(); MAX_TX_CALLS]
+            calldata: [Call::new(); MAX_TX_CALLS],
         }
     }
 
