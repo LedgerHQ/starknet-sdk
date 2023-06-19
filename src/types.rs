@@ -50,6 +50,11 @@ impl FieldElement {
         self.value.copy_from_slice(&f.value);
     }
 
+    pub fn div_rem(&self, other: &FieldElement) -> (FieldElement, FieldElement) {
+        let remainder = self % other;
+        (&(self - &remainder) / other, remainder)
+    }
+
     pub fn inverse(&self) -> FieldElement {
         let mut result_bn: cx_bn_t = Default::default();
         let mut self_bn: cx_bn_t = Default::default();
