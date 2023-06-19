@@ -1,7 +1,8 @@
-use core::ops::{Add, Mul, Rem, Sub};
+use core::ops::{Add, Div, Mul, Rem, Sub};
 use nanos_sdk::bindings::{
     cx_bn_add, cx_bn_alloc, cx_bn_alloc_init, cx_bn_destroy, cx_bn_export, cx_bn_lock,
-    cx_bn_mod_add, cx_bn_mod_mul, cx_bn_mod_sub, cx_bn_reduce, cx_bn_t, cx_bn_unlock,
+    cx_bn_mod_add, cx_bn_mod_invert_nprime, cx_bn_mod_mul, cx_bn_mod_sub, cx_bn_reduce, cx_bn_t,
+    cx_bn_unlock,
 };
 use nanos_sdk::string::String;
 
@@ -47,6 +48,39 @@ impl FieldElement {
 
     pub fn copy_from(&mut self, f: &FieldElement) {
         self.value.copy_from_slice(&f.value);
+    }
+
+    pub fn inverse(&self) -> FieldElement {
+        let mut result_bn: cx_bn_t = Default::default();
+        let mut self_bn: cx_bn_t = Default::default();
+        let mut p_bn: cx_bn_t = Default::default();
+        let mut result = FieldElement::new();
+
+        unsafe {
+            cx_bn_lock(32, 0);
+
+            // Initialize and set self_bn
+            cx_bn_alloc_init(&mut self_bn, 32, self.value[..].as_ptr(), 32);
+            cx_bn_alloc_init(&mut p_bn, 32, P.value[..].as_ptr(), 32);
+
+            // Allocate space for result_bn
+            cx_bn_alloc(&mut result_bn, 32);
+
+            // Perform inversion
+            cx_bn_mod_invert_nprime(result_bn, self_bn, p_bn);
+
+            // Export result_bn to result FieldElement
+            cx_bn_export(result_bn, result.value[..].as_mut_ptr(), 32);
+
+            // Destroy used bignums
+            cx_bn_destroy(&mut self_bn);
+            cx_bn_destroy(&mut result_bn);
+            cx_bn_destroy(&mut p_bn);
+
+            cx_bn_unlock();
+        }
+
+        result
     }
 }
 
@@ -196,6 +230,17 @@ impl<'a, 'b> Rem<&'b FieldElement> for &'a FieldElement {
         }
 
         result
+    }
+}
+
+impl<'a, 'b> Div<&'b FieldElement> for &'a FieldElement {
+    type Output = FieldElement;
+
+    fn div(self, other: &'b FieldElement) -> FieldElement {
+        let other_inverse = other.inverse();
+
+        // Use the multiplication method defined earlier
+        self * &other_inverse
     }
 }
 
