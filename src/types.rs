@@ -1,12 +1,13 @@
+use core::cmp::Ordering;
 use core::ops::{Add, Div, Mul, Rem, Sub};
 use nanos_sdk::bindings::{
-    cx_bn_add, cx_bn_alloc, cx_bn_alloc_init, cx_bn_destroy, cx_bn_export, cx_bn_lock,
+    cx_bn_add, cx_bn_alloc, cx_bn_alloc_init, cx_bn_cmp, cx_bn_destroy, cx_bn_export, cx_bn_lock,
     cx_bn_mod_add, cx_bn_mod_invert_nprime, cx_bn_mod_mul, cx_bn_mod_sub, cx_bn_reduce, cx_bn_t,
     cx_bn_unlock,
 };
 use nanos_sdk::string::String;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default, PartialOrd)]
 pub struct FieldElement {
     pub value: [u8; 32],
 }
@@ -91,8 +92,8 @@ impl FieldElement {
 
 const P: FieldElement = FieldElement {
     value: [
-        0x08, 0, 0, 0, 0, 0, 0, 0x11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 1,
+        0x08, 0, 0, 0, 0, 0, 0, 0x11, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 1,
     ],
 };
 
@@ -235,6 +236,37 @@ impl<'a, 'b> Rem<&'b FieldElement> for &'a FieldElement {
         }
 
         result
+    }
+}
+
+impl Ord for FieldElement {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let mut self_bn: cx_bn_t = Default::default();
+        let mut other_bn: cx_bn_t = Default::default();
+        let mut result: i32 = 0;
+
+        unsafe {
+            cx_bn_lock(32, 0);
+
+            // Initialize and set self_bn and other_bn
+            cx_bn_alloc_init(&mut self_bn, 32, self.value[..].as_ptr(), 32);
+            cx_bn_alloc_init(&mut other_bn, 32, other.value[..].as_ptr(), 32);
+
+            // Compare the numbers
+            cx_bn_cmp(self_bn, other_bn, &mut result);
+
+            // Destroy used bignums
+            cx_bn_destroy(&mut self_bn);
+            cx_bn_destroy(&mut other_bn);
+
+            cx_bn_unlock();
+        }
+
+        match result {
+            r if r < 0 => Ordering::Less,
+            r if r > 0 => Ordering::Greater,
+            _ => Ordering::Equal,
+        }
     }
 }
 
