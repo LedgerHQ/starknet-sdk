@@ -6,7 +6,7 @@ use nanos_sdk::bindings::{
 };
 use nanos_sdk::string::String;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
 pub struct FieldElement {
     pub value: [u8; 32],
 }
@@ -327,7 +327,11 @@ pub enum AbstractCallData {
     CallRef(usize, usize),
 }
 
-#[derive(Debug, Copy, Clone)]
+impl Default for AbstractCallData {
+    fn default() -> Self { AbstractCallData::Felt(Default::default())}
+}
+
+#[derive(Debug, Copy, Clone, Default)]
 pub struct AbstractCall {
     pub to: FieldElement,
     pub method: String<32>,
@@ -368,7 +372,7 @@ impl AbstractCall {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Default)]
 pub struct Call {
     pub to: FieldElement,
     pub method: String<32>,
@@ -397,6 +401,7 @@ impl Call {
     }
 }
 
+#[derive(Debug, Copy, Clone, Default)]
 pub struct TransactionInfo {
     pub sender_address: FieldElement,
     pub max_fee: FieldElement,
@@ -428,6 +433,7 @@ impl TransactionInfo {
     }
 }
 
+#[derive(Debug, Copy, Clone, Default)]
 pub struct Transaction {
     pub tx_info: TransactionInfo,
     pub calldata: [Call; MAX_TX_CALLS],
