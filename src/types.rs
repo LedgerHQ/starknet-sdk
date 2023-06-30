@@ -484,3 +484,11 @@ impl Transaction {
         self.calldata.fill(Call::new());
     }
 }
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct UiParam {
+    pub num_ui_screens: u8,
+    pub title: String<32>,
+    pub msg: String<64>
+}
+
