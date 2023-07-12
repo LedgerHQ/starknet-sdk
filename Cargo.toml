@@ -6,8 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-#nanos_sdk = { git = "https://github.com/yogh333/ledger-nanos-sdk.git", branch="feat/libcall_support" }
-nanos_sdk = { path = "../ledger-nanos-sdk" }
+nanos_sdk = { git = "https://github.com/yogh333/ledger-nanos-sdk.git", branch="feat/libcall_support" }
 
 [profile.dev]
 panic = "abort"
@@ -16,12 +15,3 @@ panic = "abort"
 panic = "abort"
 opt-level = 'z' 
 lto = true
-
-[package.metadata.nanos]
-api_level = "1"
-curve = ["secp256k1"]
-path = ["m/2645'"]
-flags = "0"
-icon = "crab.gif"
-icon_small = "starknet_small.gif"
-name = "staRknet"
